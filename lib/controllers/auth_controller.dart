@@ -22,9 +22,9 @@ class AuthController extends GetxController {
     isLoggedIn.value = userData != null;
   }
 
-  Future<ApiResponse> isUserExists(String phone) async {
+  Future<ApiResponse> isUserExists(String phone, String password) async {
     try {
-      final endpoint = "${ApiEndpoints.users}?phone=$phone";
+      final endpoint = "${ApiEndpoints.users}?phone=$phone&password=$password";
       debugPrint('endpoint: $endpoint');
 
       final response = await http.get(Uri.parse(endpoint));
@@ -67,15 +67,15 @@ class AuthController extends GetxController {
     try {
       debugPrint('Attempting login with phone: $phone and password: $password');
 
-      final userResponse = await isUserExists(phone);
+      final userResponse = await isUserExists(phone, password);
 
-      isLoggedIn.value = true;
-
-      await Prefs.setMap('userdata', (userResponse.data as User).toJson());
-
+      if (userResponse.success) {
+        isLoggedIn.value = true;
+        await Prefs.setMap('userdata', (userResponse.data as User).toJson());
+      }
       return userResponse;
-    } catch (e) {
-      debugPrint('Login error: $e');
+    } catch (e, stackTrace) {
+      debugPrint('Login error: $e\n$stackTrace');
       return ApiResponse(success: false, message: e.toString(), data: null);
     }
   }
@@ -86,7 +86,7 @@ class AuthController extends GetxController {
         'Attempting registration with phone: $phone and password: $password',
       );
 
-      final isUserExists = await this.isUserExists(phone);
+      final isUserExists = await this.isUserExists(phone, password);
 
       if (isUserExists.success) {
         return ApiResponse(
