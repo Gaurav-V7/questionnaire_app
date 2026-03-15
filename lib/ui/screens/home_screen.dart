@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:questionnaire_app/constants/ui_constants.dart';
-import 'package:questionnaire_app/controllers/submission_controller.dart'
-    show QuestionnaireStatusItem, SubmissionController;
+import 'package:questionnaire_app/controllers/submission_controller.dart';
 import 'package:questionnaire_app/data/questionnaires.dart';
+import 'package:questionnaire_app/models/questionnaire.dart';
 import 'package:questionnaire_app/routes/app_routes.dart';
 import 'package:questionnaire_app/utils/common.dart';
 import 'package:questionnaire_app/utils/ui.dart';
@@ -16,71 +17,60 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final submissionController = getOrPut(SubmissionController.new);
-  late Future<List<QuestionnaireStatusItem>> _questionnairesFuture;
 
   @override
   void initState() {
     super.initState();
-    _questionnairesFuture = submissionController.getQuestionnairesWithStatus(
-      questionnaires,
-    );
+    submissionController.loadSubmissions();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: FutureBuilder<List<QuestionnaireStatusItem>>(
-        future: _questionnairesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Failed to load questionnaires: ${snapshot.error}'),
-            );
-          }
-
-          return _buildQuestionnaireList(snapshot.data ?? []);
-        },
+      body: SafeArea(
+        child: Obx(
+          () {
+            // Ensure Obx registers this reactive dependency in its own scope.
+            final _ = submissionController.submittedQuestionnaireIds.length;
+            return _buildQuestionnaireList();
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildQuestionnaireList(List<QuestionnaireStatusItem> items) {
+  Widget _buildQuestionnaireList() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: paddingMedium),
       child: ListView.builder(
-        itemCount: items.length,
+        itemCount: questionnaires.length,
         itemBuilder: (context, index) {
-          return _buildQuestionnaireCard(items[index]);
+          return _buildQuestionnaireCard(questionnaires[index]);
         },
       ),
     );
   }
 
-  Widget _buildQuestionnaireCard(QuestionnaireStatusItem item) {
+  Widget _buildQuestionnaireCard(Questionnaire questionnaire) {
+    final isSubmitted = submissionController.isSubmitted(questionnaire.id);
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        title: Text(item.questionnaire.title),
-        subtitle: Text(item.questionnaire.description),
+        title: Text(questionnaire.title),
+        subtitle: Text(questionnaire.description),
         trailing: Icon(
-          item.isSubmitted ? Icons.check_circle_rounded : Icons.pending,
-          color: item.isSubmitted ? Colors.green : Colors.grey,
+          isSubmitted ? Icons.check_circle_rounded : Icons.pending,
+          color: isSubmitted ? Colors.green : Colors.grey,
         ),
         onTap: () async {
           final result = await navigateTo(
             AppRoutes.questions,
-            data: {'id': item.questionnaire.id},
+            data: {'id': questionnaire.id},
           );
 
           if (result == true) {
-            setState(() {
-              _questionnairesFuture = submissionController
-                  .getQuestionnairesWithStatus(questionnaires);
-            });
+            await submissionController.loadSubmissions();
             snackBar("Success", "Questionnaire submitted");
           }
         },

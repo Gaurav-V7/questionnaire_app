@@ -67,4 +67,14 @@ class DatabaseHelper {
 
     return List<int>.from(jsonDecode(answersJson));
   }
+
+  Future<List<Map<String, dynamic>>> getSubmissionHistory() async {
+    final db = await database;
+
+    return db.query(
+      'submissions',
+      columns: ['questionnaire_id', 'submitted_at'],
+      orderBy: 'submitted_at DESC',
+    );
+  }
 }

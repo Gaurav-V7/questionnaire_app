@@ -28,6 +28,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
   Map<int, int?> selectedAnswers = {};
 
   final RxBool isSubmitting = false.obs;
+  final RxBool isAlreadySubmitted = false.obs;
 
   @override
   void initState() {
@@ -36,10 +37,35 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
     final args = Get.arguments;
 
     if (args != null && args.containsKey('id')) {
-      questionnaireId.value = args?['id'] ?? "";
+      final id = args['id'];
+      if (id is int) {
+        questionnaireId.value = id;
+      } else if (id is String) {
+        questionnaireId.value = int.tryParse(id);
+      }
     }
 
     submissionController.loadSubmissions();
+    _loadExistingAnswers();
+  }
+
+  Future<void> _loadExistingAnswers() async {
+    final id = questionnaireId.value;
+    if (id == null) return;
+
+    final existingAnswers = await DatabaseHelper.instance.getSubmissionAnswers(
+      id,
+    );
+
+    if (existingAnswers == null || existingAnswers.isEmpty) return;
+
+    if (!mounted) return;
+    setState(() {
+      isAlreadySubmitted.value = true;
+      selectedAnswers = {
+        for (var i = 0; i < existingAnswers.length; i++) i: existingAnswers[i],
+      };
+    });
   }
 
   List<Question> getQuestionsByQuestionnaireId(int? id) {
@@ -62,6 +88,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
         itemCount: questions.length + 1,
         itemBuilder: (context, index) {
           if (index == questions.length) {
+            if (isAlreadySubmitted.value) return const SizedBox.shrink();
             return _buildSubmitButton(questions.length, questionnaireId.value);
           }
 
@@ -85,6 +112,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
             RadioGroup<int>(
               groupValue: selectedAnswers[qIndex],
               onChanged: (value) {
+                if (isAlreadySubmitted.value) return;
                 setState(() {
                   selectedAnswers[qIndex] = value;
                 });
@@ -96,6 +124,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                   (index) => RadioListTile<int>(
                     value: index,
                     title: Text(question.options[index]),
+                    enabled: !isAlreadySubmitted.value,
                   ),
                 ),
               ),
@@ -156,6 +185,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
 
     try {
       await DatabaseHelper.instance.insertSubmission(data);
+      await submissionController.loadSubmissions();
       navigateBack(result: true);
     } catch (e) {
       debugPrint('Submission error: $e');
