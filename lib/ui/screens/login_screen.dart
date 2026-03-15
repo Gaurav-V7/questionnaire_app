@@ -23,12 +23,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _formKey = GlobalKey<FormState>();
 
-  TextEditingController phoneController = TextEditingController(
-    text: "1234567890",
-  );
-  TextEditingController passwordController = TextEditingController(
-    text: "password",
-  );
+  TextEditingController phoneController = TextEditingController();
+  TextEditingController passwordController = TextEditingController();
   TextEditingController confirmPasswordController = TextEditingController();
 
   final RxBool isLoading = false.obs;
